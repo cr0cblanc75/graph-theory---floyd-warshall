@@ -10,12 +10,13 @@
 
     src/
      |   app/
-     |   ├── App.java -> with inside the Floyd-Warshall
+     |   └── App.java -> with inside the Floyd-Warshall
      ├── structure/
      |   ├── Edge.java
      |   ├── Graph.java
      |   └── Node.java
-     ├── .gitognore
+     ├── graphs/
+     ├── .gitignore
      └── README.md
 
 ### Core Design
