@@ -9,7 +9,8 @@ public class App {
 
     public static void main(String[] args) {
         boolean continueSession = true; // condition to keep the program running
-        System.out.println("\n--------------------------------------------- New Session ---------------------------------------------");
+        System.out.println(
+                "\n--------------------------------------------- New Session ---------------------------------------------");
 
         try (Scanner sc = new Scanner(System.in);) {
 
@@ -48,16 +49,27 @@ public class App {
                 System.out.print("Which graphs do you want to load ? : ");
                 String number = sc.nextLine().trim();
 
-                String path = "src/graphs/" + number + ".txt"; // relative path (according the the starting point of the project architecture filre) to the any graph file
+                File classDir = new File(App.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+                // Ascending to /src
+                File srcDir = classDir;
+                while (srcDir != null && !new File(srcDir, "app").exists()) {
+                    srcDir = srcDir.getParentFile();
+                }
+                if (srcDir == null) {
+                    throw new RuntimeException(
+                            "Impossible to reach the folder src, be sure the architecture is projet/src/app & projet/src/graphs");
+                }
 
-                File file = new File(path);
+                File graphsDir = new File(srcDir, "graphs");
+                File file = new File(graphsDir, number + ".txt");
+
                 if (!file.exists()) {
-                    System.out.println(">>> File " + path + " not found. Please try again.\n");
+                    System.out.println(">>> File " + file.getAbsolutePath() + " not found. Please try again.\n");
                     continue;
                 }
 
                 try {
-                    g = loadGraphFromFile(path);
+                    g = loadGraphFromFile(file.getAbsolutePath());
                 } catch (IOException e) {
                     System.out.println(">>> Error while reading the file : " + e.getMessage());
                     System.out.println(">>> Please try again.");
@@ -72,10 +84,11 @@ public class App {
 
     /*
      * Method to convert a graph write in the .txt, to the Graph-object we will use
-      * 
-      * The .txt file format :
-      * First line : 1 if the graph is directed, 0 if undirected
-      * Next lines : originId(Node = vertex) "space" destinationId(Node = vertex) "space" weight (Edge = arc)
+     * 
+     * The .txt file format :
+     * First line : 1 if the graph is directed, 0 if undirected
+     * Next lines : originId(Node = vertex) "space" destinationId(Node = vertex)
+     * "space" weight (Edge = arc)
      */
     public static Graph loadGraphFromFile(String path) throws IOException {
 
@@ -83,7 +96,8 @@ public class App {
             boolean directed = false; // setting a default value
 
             if (fileScanner.hasNextLine()) {
-                directed = fileScanner.nextLine().trim().equals("1"); // read the first line to determine if the graph is directed (1) or undirected (0)
+                directed = fileScanner.nextLine().trim().equals("1"); // read the first line to determine if the graph
+                                                                      // is directed (1) or undirected (0)
             }
 
             Graph g = new Graph(directed);
@@ -108,7 +122,8 @@ public class App {
     }
 
     /*
-     * Method to display the results (Floyd-Warshall matrix, ...) of a paramter passed Graph
+     * Method to display the results (Floyd-Warshall matrix, ...) of a paramter
+     * passed Graph
      */
     public static void displayResults(Graph g) {
         System.out.println("\nFloyd-Warshall matrix:");
