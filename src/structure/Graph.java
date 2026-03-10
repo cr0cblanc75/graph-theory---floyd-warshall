@@ -45,7 +45,7 @@ public final class Graph {
     }
 
     private void putMinEdge(Node origin, Node destination, int weight) {
-        Map<Integer, Edge> out = this.edges.computeIfAbsent(origin.id(), k -> new HashMap<>());
+        Map<Integer, Edge> out = this.edges.computeIfAbsent(origin.id(), _ -> new HashMap<>());
         Edge existing = out.get(destination.id());
 
         if (existing == null || weight < existing.weight()) {
@@ -90,8 +90,6 @@ public final class Graph {
     }
 
     /**
-     * Return a Map :
-     *
      * originId -> (destId -> smallest weight from originId to destId)
      */
     public void floydWarshall() {
