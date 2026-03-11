@@ -1,20 +1,27 @@
 package app;
 
+import logger.LoggingConfig;
+import structure.Graph;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
-import structure.Graph;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class App {
 
+    private static final Logger LOGGER = Logger.getLogger(App.class.getName());
+
+    static {
+        LoggingConfig.configureLogger(LOGGER);
+    }
+
     public static void main(String[] args) {
         boolean continueSession = true; // condition to keep the program running
-        System.out.println(
-                "\n--------------------------------------------- New Session ---------------------------------------------");
-
-        try (Scanner sc = new Scanner(System.in);) {
-
-            // Initialization the scenario by loading the first graph
+        System.out.println("\n--------------------------------------------- New Session ---------------------------------------------");
+        //try with resources (here, global scanner instance) that loads the graph
+        try (Scanner sc = new Scanner(System.in)) {
             Graph g = askingFileToRead(sc);
             displayResults(g);
 
@@ -28,13 +35,16 @@ public class App {
                         g = askingFileToRead(sc);
                         displayResults(g);
                     } else {
-                        System.out.println("Okay, end of the session.");
+                        LOGGER.info("End of session");
                         continueSession = false;
                     }
                 } catch (Exception e) {
-                    System.out.println("An unexpected error occurred: " + e.getMessage());
+                    LOGGER.log(Level.SEVERE, "Unexpected error during session loop", e);
                 }
             }
+
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Fatal application error", e);
         }
     }
 
@@ -42,62 +52,56 @@ public class App {
      * Method to ask the user which graph file to load
      */
     public static Graph askingFileToRead(Scanner sc) {
-        try {
-            Graph g = null; // g will be our Graph to be tested
+        Graph g = null; //g is the scenario's graph to be studied
 
-            while (g == null) {
-                System.out.print("Which graphs do you want to load ? : ");
+        while (g == null) {
+            try {
+                System.out.print("Which graph do you want to load? ");
                 String number = sc.nextLine().trim();
 
-                File classDir = new File(App.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-                // Ascending to /src
-                File srcDir = classDir;
-                while (srcDir != null && !new File(srcDir, "app").exists()) {
-                    srcDir = srcDir.getParentFile();
-                }
-                if (srcDir == null) {
-                    throw new RuntimeException(
-                            "Impossible to reach the folder src, be sure the architecture is projet/src/app & projet/src/graphs");
-                }
-
-                File graphsDir = new File(srcDir, "graphs");
-                File file = new File(graphsDir, number + ".txt");
+                String path = "src/graphs/" + number + ".txt"; //file relative path
+                File file = new File(path);
 
                 if (!file.exists()) {
-                    System.out.println(">>> File " + file.getAbsolutePath() + " not found. Please try again.\n");
+                    LOGGER.warning("File not found: " + path);
                     continue;
                 }
 
-                try {
-                    g = loadGraphFromFile(file.getAbsolutePath());
-                } catch (IOException e) {
-                    System.out.println(">>> Error while reading the file : " + e.getMessage());
-                    System.out.println(">>> Please try again.");
-                }
-            }
-            return g;
+                g = loadGraphFromFile(path);
+                g.attachGraphLog(extractGraphKey(path));
+                LOGGER.info("Graph loaded successfully from " + path);
 
-        } catch (Exception e) {
-            throw new RuntimeException("Unexpected error while reading input: " + e.getMessage(), e);
+            } catch (IOException e) {
+                LOGGER.log(Level.SEVERE, "Error while reading graph file", e);
+                System.out.println("Error while reading the file. Please try again.");
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Unexpected error while loading graph", e);
+                System.out.println("Unexpected error. Please try again.");
+            }
         }
+
+        return g;
+    }
+
+    private static String extractGraphKey(String path) {
+        String fileName = new File(path).getName();
+        int dotIndex = fileName.lastIndexOf('.');
+        return dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
     }
 
     /*
      * Method to convert a graph write in the .txt, to the Graph-object we will use
-     * 
+     *
      * The .txt file format :
      * First line : 1 if the graph is directed, 0 if undirected
-     * Next lines : originId(Node = vertex) "space" destinationId(Node = vertex)
-     * "space" weight (Edge = arc)
+     * Next lines : originId(Node = vertex) "space" destinationId(Node = vertex) "space" weight (Edge = arc)
      */
     public static Graph loadGraphFromFile(String path) throws IOException {
-
         try (Scanner fileScanner = new Scanner(new File(path))) {
-            boolean directed = false; // setting a default value
+            boolean directed = false; // graph is by default undirected
 
             if (fileScanner.hasNextLine()) {
-                directed = fileScanner.nextLine().trim().equals("1"); // read the first line to determine if the graph
-                                                                      // is directed (1) or undirected (0)
+                directed = fileScanner.nextLine().trim().equals("1"); //if 1st line is 1, it's a directed graph
             }
 
             Graph g = new Graph(directed);
@@ -122,12 +126,13 @@ public class App {
     }
 
     /*
-     * Method to display the results (Floyd-Warshall matrix, ...) of a paramter
-     * passed Graph
+     * Method to display the results (Floyd-Warshall matrix, ...) of a parameter-passed Graph
      */
     public static void displayResults(Graph g) {
-        System.out.println("\nFloyd-Warshall matrix:");
+        LOGGER.info("Starting Floyd-Warshall computation");
+        LOGGER.info("Floyd-Warshall matrix:");
         g.floydWarshall();
+        LOGGER.info("Finished Floyd-Warshall computation");
     }
 
 }

@@ -2,7 +2,7 @@
 
 ## Requirements
 
--   **Java 23** (Algrotithm)
+-   **Java 23**
 
 ------------------------------------------------------------------------
 
@@ -16,6 +16,9 @@
      |   ├── Graph.java
      |   └── Node.java
      ├── graphs/
+     ├── logs/
+     |   ├── graphs/
+     |   └── currentRun.log
      ├── .gitignore
      └── README.md
 
