@@ -1,6 +1,9 @@
 package structure;
 
+import logger.LoggingConfig;
+
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * Graph structure designed to support multiple independent graphs at runtime.
@@ -8,6 +11,12 @@ import java.util.*;
  * edges.get(u.getId()).get(v.getId()) -> Edge from node u to node v
  */
 public final class Graph {
+
+    private static final Logger LOGGER = Logger.getLogger(Graph.class.getName());
+
+    static {
+        LoggingConfig.configureLogger(LOGGER);
+    }
 
     private final Map<Integer, Node> nodes = new HashMap<>();               // id -> Node
     private final Map<Integer, Map<Integer, Edge>> edges = new HashMap<>(); // originId -> (destId -> Edge)
@@ -89,11 +98,15 @@ public final class Graph {
         return Collections.unmodifiableMap(this.edges);
     }
 
+    public void attachGraphLog(String graphKey) {
+        LoggingConfig.configureGraphLogger(LOGGER, graphKey);
+    }
+
     /**
-     * originId -> (destId -> smallest weight from originId to destId)
+     * originId -> (destId -> the smallest weight from originId to destId)
      */
     public void floydWarshall() {
-
+        
         final int INF = Integer.MAX_VALUE / 2; // avoid value overflow, and memory overflow if we do INF + INF when processing the Floyd-Warshall algo
 
         // Step 1: Initialize distance matrix
@@ -128,12 +141,12 @@ public final class Graph {
                 P.get(u).put(e.destination().id(), u);
             }
         }
-        System.out.println("---- Initial distance matrix ----");
+        printlnAndInfo("---- Initial distance matrix ----");
         printDistanceMatrix(L, false);
-        System.out.println();
-        System.out.println("---- Initial predecessor matrix ----");
+        printlnAndInfo();
+        printlnAndInfo("---- Initial predecessor matrix ----");
         printDistanceMatrix(P, true);
-        System.out.println();
+        printlnAndInfo();
 
         // Step 3: Floyd-Warshall core
         /*
@@ -148,7 +161,7 @@ public final class Graph {
          * The initial and final distance matrix.
          */
         for (Node k : nodes.values()) {
-            System.out.println("\nIntermediate node : " + k.id());
+            printlnAndInfo("\nIntermediate node : " + k.id());
             for (Node i : nodes.values()) {
                 //System.out.println("for origin node : " + i.id());
                 for (Node j : nodes.values()) {
@@ -164,26 +177,28 @@ public final class Graph {
                 }
             }
             printDistanceMatrix(L, false);
-            System.out.println();
+            printlnAndInfo();
             printDistanceMatrix(P, true);
-            System.out.println();
+            printlnAndInfo();
         }
 
         // Step 4: Print the final distance matrix
-        System.out.println("---- Final distance matrix ----");
+        printlnAndInfo("---- Final distance matrix ----");
         printDistanceMatrix(L, false);
-        System.out.println();
+        printlnAndInfo();
 
-        System.out.println("---- Final predecessor matrix ----");
+        printlnAndInfo("---- Final predecessor matrix ----");
         printDistanceMatrix(P, true);
-        System.out.println();
+        printlnAndInfo();
 
         // Step 5: Detect negative cycles
         for (Node n : nodes.values()) {
             if (L.get(n.id()).get(n.id()) < 0) {
-                System.out.println(">>> Warning: Negative cycle detected involving node " + n.id());
+                printlnAndWarning(">>> Warning: Negative cycle detected involving node " + n.id());
             }
         }
+
+        LOGGER.info("Finished Floyd-Warshall computation");
 
     }
 
@@ -212,25 +227,28 @@ public final class Graph {
 
         int cellWidth = 10;
 
+        StringBuilder matrix = new StringBuilder();
+
         // Header
-        System.out.print(" ".repeat(cellWidth));
-        System.out.print("|");
+        matrix.append(" ".repeat(cellWidth));
+        matrix.append("|");
         for (int id : ids) {
-            System.out.print(center(String.valueOf(id), cellWidth));
+            matrix.append(center(String.valueOf(id), cellWidth));
         }
-        System.out.println();
+        matrix.append(System.lineSeparator());
 
         // Separator
-        System.out.print("-".repeat(cellWidth));
-        System.out.print("|");
-        System.out.println("-".repeat(cellWidth * ids.size()));
+        matrix.append("-".repeat(cellWidth));
+        matrix.append("|");
+        matrix.append("-".repeat(cellWidth * ids.size()));
+        matrix.append(System.lineSeparator());
 
         // Rows
         for (int i : ids) {
 
             // Row header
-            System.out.print(center(String.valueOf(i), cellWidth));
-            System.out.print("|");
+            matrix.append(center(String.valueOf(i), cellWidth));
+            matrix.append("|");
 
             // Row values
             for (int j : ids) {
@@ -243,10 +261,29 @@ public final class Graph {
                     toPrint = (value >= INF) ? "INF" : String.valueOf(value);
                 }
 
-                System.out.print(center(toPrint, cellWidth));
+                matrix.append(center(toPrint, cellWidth));
             }
 
-            System.out.println();
+            matrix.append(System.lineSeparator());
         }
+
+        String renderedMatrix = matrix.toString();
+        System.out.print(renderedMatrix);
+        LOGGER.info(renderedMatrix);
+    }
+
+    private void printlnAndInfo(String message) {
+        System.out.println(message);
+        LOGGER.info(message);
+    }
+
+    private void printlnAndInfo() {
+        System.out.println();
+        LOGGER.info("");
+    }
+
+    private void printlnAndWarning(String message) {
+        System.out.println(message);
+        LOGGER.warning(message);
     }
 }

@@ -1,38 +1,20 @@
 package app;
 
+import logger.LoggingConfig;
 import structure.Graph;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
-import java.util.logging.FileHandler;
-import java.util.logging.Formatter;
 import java.util.logging.Level;
-import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 public class App {
 
     private static final Logger LOGGER = Logger.getLogger(App.class.getName());
 
     static {
-        try {
-            Files.createDirectories(Path.of("logs"));
-
-            FileHandler fileHandler = new FileHandler("logs/currentRun.log", true);
-            fileHandler.setEncoding("UTF-8");
-            fileHandler.setLevel(Level.ALL);
-            fileHandler.setFormatter(new SimpleAppFormatter());
-
-            LOGGER.addHandler(fileHandler);
-            LOGGER.setUseParentHandlers(false); // disable default console logger
-            LOGGER.setLevel(Level.ALL);
-
-        } catch (IOException e) {
-            throw new RuntimeException("Cannot initialize logger", e);
-        }
+        LoggingConfig.configureLogger(LOGGER);
     }
 
     public static void main(String[] args) {
@@ -86,6 +68,7 @@ public class App {
                 }
 
                 g = loadGraphFromFile(path);
+                g.attachGraphLog(extractGraphKey(path));
                 LOGGER.info("Graph loaded successfully from " + path);
 
             } catch (IOException e) {
@@ -98,6 +81,12 @@ public class App {
         }
 
         return g;
+    }
+
+    private static String extractGraphKey(String path) {
+        String fileName = new File(path).getName();
+        int dotIndex = fileName.lastIndexOf('.');
+        return dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
     }
 
     /*
@@ -146,29 +135,4 @@ public class App {
         LOGGER.info("Finished Floyd-Warshall computation");
     }
 
-    /*
-     * Custom formatter for cleaner log lines
-     */
-    private static class SimpleAppFormatter extends Formatter {
-        @Override
-        public String format(LogRecord record) {
-            StringBuilder sb = new StringBuilder();
-
-            sb.append("[")
-                    .append(record.getLevel())
-                    .append("] ")
-                    .append(formatMessage(record))
-                    .append(System.lineSeparator());
-
-            if (record.getThrown() != null) {
-                Throwable t = record.getThrown();
-                sb.append(t).append(System.lineSeparator());
-                for (StackTraceElement ste : t.getStackTrace()) {
-                    sb.append("    at ").append(ste).append(System.lineSeparator());
-                }
-            }
-
-            return sb.toString();
-        }
-    }
 }
