@@ -7,7 +7,7 @@ import java.util.logging.Logger;
 
 /**
  * Graph structure designed to support multiple independent graphs at runtime.
- * optimized to iterate through as Floyd-Warshall algorithm needs it ofc
+ * optimized to iterate through as Floyd-Warshall algorithm
  * edges.get(u.getId()).get(v.getId()) -> Edge from node u to node v
  */
 public final class Graph {
