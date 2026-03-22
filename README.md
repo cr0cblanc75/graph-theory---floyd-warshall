@@ -7,6 +7,7 @@
 ------------------------------------------------------------------------
 
 ## Project Structure
+Be sure to have precisely this, or the project will never run !!
 
     src/
      |   app/
