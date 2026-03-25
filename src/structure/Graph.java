@@ -110,21 +110,21 @@ public final class Graph {
         final int INF = Integer.MAX_VALUE / 2; // avoid value overflow, and memory overflow if we do INF + INF when processing the Floyd-Warshall algo
 
         // Step 1: Initialize distance matrix
-        Map<Integer, Map<Integer, Integer>> L = new HashMap<>();
-        Map<Integer, Map<Integer, Integer>> P = new HashMap<>();
+        Map<Integer, Map<Integer, Set<Integer>>> L = new HashMap<>();
+        Map<Integer, Map<Integer, Set<Integer>>> P = new HashMap<>();
 
         // Double loop to set the diagonal to 0, and the rest to INF. As the shortest path from node X to node X is 0, and else we don't know.
         for (Node u : nodes.values()) {
-            Map<Integer, Integer> rowDist = new HashMap<>(); // temp Map for L
-            Map<Integer, Integer> rowPred = new HashMap<>(); // temp Map for P
+            Map<Integer, Set<Integer>> rowDist = new HashMap<>(); // temp Map for L
+            Map<Integer, Set<Integer>> rowPred = new HashMap<>(); // temp Map for P
 
             for (Node v : nodes.values()) {
                 if (u.equals(v)) {
-                    rowDist.put(v.id(), 0);    // from node X to node X, the shortest path is 0
-                    rowPred.put(v.id(), null); // no predecessor for the same node, as we are already there
+                    rowDist.put(v.id(), mutableSetOf(0)); // from node X to node X, the shortest path is 0
+                    rowPred.put(v.id(), new HashSet<>()); // no predecessor for the same node, as we are already there
                 } else {
-                    rowDist.put(v.id(), INF);         // esle we don't know the shortest path 
-                    rowPred.put(v.id(), null); // else we don't know
+                    rowDist.put(v.id(), mutableSetOf(INF)); // else we don't know the shortest path
+                    rowPred.put(v.id(), new HashSet<>());   // else we don't know
                 }
             }
             L.put(u.id(), rowDist);
@@ -137,8 +137,8 @@ public final class Graph {
             // you also have entry.getKey() & entry.getValue() 
             int u = entry.getKey();
             for (Edge e : entry.getValue().values()) {
-                L.get(u).put(e.destination().id(), e.weight());
-                P.get(u).put(e.destination().id(), u);
+                setDistance(L, u, e.destination().id(), e.weight());
+                P.get(u).get(e.destination().id()).add(u);
             }
         }
         printlnAndInfo("---- Initial distance matrix ----");
@@ -166,13 +166,16 @@ public final class Graph {
                 //System.out.println("for origin node : " + i.id());
                 for (Node j : nodes.values()) {
 
-                    int ik = L.get(i.id()).get(k.id()); // computing the differents routes
-                    int kj = L.get(k.id()).get(j.id());
-                    int ij = L.get(i.id()).get(j.id());
+                    int ik = getDistance(L, i.id(), k.id()); // computing the differents routes
+                    int kj = getDistance(L, k.id(), j.id());
+                    int ij = getDistance(L, i.id(), j.id());
 
                     if (ik != INF && kj != INF && ik + kj < ij) { // if they are not INF, and passing by k is faster
-                        L.get(i.id()).put(j.id(), ik + kj);    // then add it to the distance matrix
-                        P.get(i.id()).put(j.id(), P.get(k.id()).get(j.id()));
+                        setDistance(L, i.id(), j.id(), ik + kj); // then add it to the distance matrix
+                        P.get(i.id()).put(j.id(), new HashSet<>(P.get(k.id()).get(j.id())));
+                    } else if (ik != INF && kj != INF && ik + kj == ij) {
+                        // Same best distance through another route: keep all cheapest predecessors.
+                        P.get(i.id()).get(j.id()).addAll(P.get(k.id()).get(j.id()));
                     }
                 }
             }
@@ -192,10 +195,21 @@ public final class Graph {
         printlnAndInfo();
 
         // Step 5: Detect negative cycles
+        boolean hasNegativeCycle = false;
         for (Node n : nodes.values()) {
-            if (L.get(n.id()).get(n.id()) < 0) {
+            if (getDistance(L, n.id(), n.id()) < 0) {
+                hasNegativeCycle = true;
                 printlnAndWarning(">>> Warning: Negative cycle detected involving node " + n.id());
             }
+        }
+
+        // Step 6: Print shortest paths only if they are well-defined.
+        if (!hasNegativeCycle) {
+            printlnAndInfo("---- Shortest paths (all node pairs) ----");
+            printAllShortestPaths(L, P);
+            printlnAndInfo();
+        } else {
+            printlnAndWarning(">>> Skipping shortest-path listing because a negative cycle was detected.");
         }
 
         LOGGER.info("Finished Floyd-Warshall computation");
@@ -218,7 +232,7 @@ public final class Graph {
     }
 
     // Pretty prints of Floyd-Warshall distance matrix with centered values and visual separation (| and -)
-    public void printDistanceMatrix(Map<Integer, Map<Integer, Integer>> M, boolean isMPredecessor) {
+    public void printDistanceMatrix(Map<Integer, Map<Integer, Set<Integer>>> M, boolean isMPredecessor) {
 
         final int INF = Integer.MAX_VALUE / 2;
 
@@ -252,13 +266,14 @@ public final class Graph {
 
             // Row values
             for (int j : ids) {
-                Integer value = M.get(i).get(j);
+                Set<Integer> value = M.get(i).get(j);
                 String toPrint;
 
                 if (isMPredecessor) {
-                    toPrint = (value == null) ? "-" : String.valueOf(value);
+                    toPrint = value.isEmpty() ? "-" : formatSet(value);
                 } else {
-                    toPrint = (value >= INF) ? "INF" : String.valueOf(value);
+                    int bestDistance = value.stream().min(Integer::compareTo).orElse(INF);
+                    toPrint = (bestDistance >= INF) ? "INF" : String.valueOf(bestDistance);
                 }
 
                 matrix.append(center(toPrint, cellWidth));
@@ -275,6 +290,110 @@ public final class Graph {
     private void printlnAndInfo(String message) {
         System.out.println(message);
         LOGGER.info(message);
+    }
+
+    private Set<Integer> mutableSetOf(int value) {
+        Set<Integer> set = new HashSet<>();
+        set.add(value);
+        return set;
+    }
+
+    private int getDistance(Map<Integer, Map<Integer, Set<Integer>>> matrix, int originId, int destinationId) {
+        Set<Integer> values = matrix.get(originId).get(destinationId);
+        return values.stream().min(Integer::compareTo).orElse(Integer.MAX_VALUE / 2);
+    }
+
+    private void setDistance(Map<Integer, Map<Integer, Set<Integer>>> matrix, int originId, int destinationId, int value) {
+        matrix.get(originId).put(destinationId, mutableSetOf(value));
+    }
+
+    private String formatSet(Set<Integer> values) {
+        List<Integer> sorted = new ArrayList<>(values);
+        Collections.sort(sorted);
+        return sorted.toString();
+    }
+
+    private void printAllShortestPaths(Map<Integer, Map<Integer, Set<Integer>>> L,
+                                       Map<Integer, Map<Integer, Set<Integer>>> P) {
+        final int INF = Integer.MAX_VALUE / 2;
+        List<Integer> ids = new ArrayList<>(nodes.keySet());
+        Collections.sort(ids);
+
+        for (int originId : ids) {
+            for (int destinationId : ids) {
+                if (originId == destinationId) {
+                    printlnAndInfo(originId + " -> " + destinationId + " : " + originId);
+                    continue;
+                }
+
+                int distance = getDistance(L, originId, destinationId);
+                if (distance >= INF) {
+                    printlnAndInfo(originId + " -> " + destinationId + " : no path");
+                    continue;
+                }
+
+                Set<List<Integer>> paths = new LinkedHashSet<>();
+                buildPathsBackward(originId, destinationId, P,
+                        new LinkedList<>(List.of(destinationId)),
+                        new HashSet<>(Set.of(destinationId)),
+                        paths,
+                        nodes.size() + 1);
+
+                if (paths.isEmpty()) {
+                    printlnAndInfo(originId + " -> " + destinationId + " : no path");
+                    continue;
+                }
+
+                List<String> formatted = new ArrayList<>();
+                for (List<Integer> path : paths) {
+                    formatted.add(formatPath(path));
+                }
+                Collections.sort(formatted);
+                printlnAndInfo(originId + " -> " + destinationId + " : " + String.join(" OR ", formatted));
+            }
+        }
+    }
+
+    private void buildPathsBackward(int originId,
+                                    int current,
+                                    Map<Integer, Map<Integer, Set<Integer>>> P,
+                                    LinkedList<Integer> currentPath,
+                                    Set<Integer> visitedInBranch,
+                                    Set<List<Integer>> results,
+                                    int maxDepth) {
+        if (currentPath.size() > maxDepth) {
+            return;
+        }
+
+        if (current == originId) {
+            results.add(new ArrayList<>(currentPath));
+            return;
+        }
+
+        Set<Integer> predecessors = P.get(originId).get(current);
+        if (predecessors == null || predecessors.isEmpty()) {
+            return;
+        }
+
+        List<Integer> orderedPredecessors = new ArrayList<>(predecessors);
+        Collections.sort(orderedPredecessors);
+        for (int predecessor : orderedPredecessors) {
+            if (visitedInBranch.contains(predecessor)) {
+                continue;
+            }
+
+            currentPath.addFirst(predecessor);
+            visitedInBranch.add(predecessor);
+
+            buildPathsBackward(originId, predecessor, P, currentPath, visitedInBranch, results, maxDepth);
+
+            visitedInBranch.remove(predecessor);
+            currentPath.removeFirst();
+        }
+    }
+
+    private String formatPath(List<Integer> path) {
+        return path.stream().map(String::valueOf).reduce((left, right) -> left + " -> " + right).orElse("-");
     }
 
     private void printlnAndInfo() {
